@@ -1,5 +1,6 @@
 import re
 
+import b2sdk.v1 as b2
 import streamlit as st
 from streamlit.delta_generator import DeltaGenerator
 
@@ -10,7 +11,7 @@ def retrieve_styles() -> str:
     return styles
 
 @st.dialog("Regístrate")
-def open_registration() -> None:
+def open_registration(uploaded_files, bucket: b2.Bucket) -> None:
     with st.form(key="body_form"):
         email_input = st.text_input(label="Email", value="", autocomplete="email")
         st.write("No recibirás correos de Convertex más allá de la transcripción de tus documentos a .tex")
@@ -18,15 +19,36 @@ def open_registration() -> None:
         # * Apparently buttons return True if they have been pressed.
         if submit_button:
             # * Same with input but this one returns a str instead.
-            submit_registration(email_input)
+            submit_registration(email_input, uploaded_files, bucket)
 
-def submit_registration(email: str) -> None:
+def upload_file(file_data, file_name, bucket: b2.Bucket):
+    bucket.upload_bytes(file_data, file_name)
+
+def submit_registration(email: str, uploaded_files, bucket: b2.Bucket) -> None:
     valid_email: bool = validate_email(email)
     if valid_email:
+        print(uploaded_files)
+        emails: str = download_existing_file(bucket)
+        emails += f"{email}\n"
+        upload_file(emails.encode(), "emails_log.txt", bucket)
+        for uploaded_file in uploaded_files:
+            file_data = uploaded_file.read()
+            print("a")
+            upload_file(file_data, uploaded_file.name, bucket)
+            print(f"Uploaded {uploaded_file.name} to Backblaze B2.")
         st.switch_page("pages/submitted_succesfully.py")
+
     else:
         st.error(body="Dirección de correo electrónico inválida")
 
+def download_existing_file(bucket: b2.Bucket, file_name="emails_log.txt") -> str:
+    try:
+        download_dest: b2.DownloadDestBytes = b2.DownloadDestBytes()
+        file_info = bucket.download_file_by_name(file_name, download_dest)
+        file_content = download_dest.get_bytes_written().decode()
+        return file_content
+    except b2.exception.FileNotPresent:
+        return "" # * File doesn't exist, start fresh
 
 def validate_email(email: str) -> bool:
     # * This expression means: from start to end of the string, it must contain
@@ -41,8 +63,18 @@ def run(styles: str):
         page_title="Convertex",
         page_icon="assets/icon.png",
         layout="wide",
-        initial_sidebar_state="auto",
+        initial_sidebar_state="collapsed",
     )
+
+    bucket = None
+    # * Initialize Blackbaze client
+    st.session_state.loaded_client = True
+    info = b2.InMemoryAccountInfo()
+    b2_api = b2.B2Api(info)
+    application_key_id = "00572b6d75de5dd0000000001"
+    application_key = "K005O5UABt05v/ft1zGdm70iv4P23z0"
+    b2_api.authorize_account("production", application_key_id, application_key)
+    bucket: b2.Bucket = b2_api.get_bucket_by_name("convertex")
 
     # * STYLES
     markdown(styles)
@@ -65,11 +97,14 @@ def run(styles: str):
         </div>
         """
     )
-    st.file_uploader(label=":arrow_down_small: Sube tus imágenes :arrow_down_small:", type=['png', 'jpg', 'tiff'], accept_multiple_files=True)
+    uploaded_files = st.file_uploader(label=":arrow_down_small: Sube tus imágenes :arrow_down_small:", type=['png', 'jpg', 'tiff'], accept_multiple_files=True)
     columns = st.columns(3)
-    center_column = columns[0]
-    if center_column.button(label="Convertir a .tex", key="body_submit"):
-        open_registration()
+    center_column = columns[1]
+    convert_button = center_column.button(label="Convertir a .tex", key="body_submit", type="primary", use_container_width=True) 
+    if convert_button and len(uploaded_files) != 0:
+        open_registration(uploaded_files, bucket)
+    elif convert_button and len(uploaded_files) == 0:
+        st.error("Selecciona al menos un (1) archivo")
 
 styles: str = """
 <style>
@@ -116,7 +151,7 @@ styles: str = """
 
     .body-p{
         padding: 0.75rem 0.75rem 0.75rem 0.75rem;
-        margin: 2rem 0 0 0;
+        margin: 2rem 0 1rem 0;
         background-color: var(--primary-background-color);
         border-radius: 1rem;
         color: var(--primary-text-color);

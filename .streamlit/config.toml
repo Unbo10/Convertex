@@ -1,6 +1,6 @@
 [theme]
 base="light"
-primaryColor="#000000"
+primaryColor="#2f3ccf"
 backgroundColor="#eeeeee"
 secondaryBackgroundColor="#dddddd"
 textColor="#2f3ccf"
@@ -8,3 +8,6 @@ font="sans serif"
 
 [server]
 maxUploadSize=25
+
+[client]
+showSidebarNavigation = false
