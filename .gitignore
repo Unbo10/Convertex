@@ -3,3 +3,6 @@
 
 # * Ignore code editor settings
 .vscode/
+
+# * Python-related
+*__pycache__/
