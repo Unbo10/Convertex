@@ -9,3 +9,9 @@
 
 # * B2 docs explanation
 Useful_commands.md
+
+# * B2 database service output
+emails_log.txt
+
+# * Ignore tests
+tests/

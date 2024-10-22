@@ -1,3 +1,4 @@
+import datetime as dt
 import re
 
 import b2sdk.v1 as b2
@@ -29,7 +30,7 @@ def submit_registration(email: str, uploaded_files, bucket: b2.Bucket) -> None:
     if valid_email:
         print(uploaded_files)
         emails: str = download_existing_file(bucket)
-        emails += f"{email}\n"
+        emails += f"{email} {dt.datetime.now().strftime("%Y-%m-%d %H:%M:%S")}\n"
         upload_file(emails.encode(), "emails_log.txt", bucket)
         for uploaded_file in uploaded_files:
             file_data = uploaded_file.read()
